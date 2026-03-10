@@ -104,7 +104,7 @@ export default function GeneralSettings() {
   const handleExportConfig = async () => {
     try {
       const path = await save({
-        defaultPath: `sageread-config-${new Date().toISOString().slice(0, 10)}.json`,
+        defaultPath: `sageread-config-${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
 
@@ -135,7 +135,7 @@ export default function GeneralSettings() {
 
       const content = await readTextFile(selected);
       importConfigFromJson(content);
-      toast.success("配置导入成功，请重启应用以确保完全生效");
+      toast.success("配置导入成功");
     } catch (error) {
       console.error("Import config failed:", error);
       toast.error("配置导入失败", {

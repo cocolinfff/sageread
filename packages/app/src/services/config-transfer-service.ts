@@ -9,11 +9,11 @@ import { useTTSStore } from "@/store/tts-store";
 import type { SystemSettings } from "@/types/settings";
 
 export interface AppConfigExportData {
-  version: 1;
+  version: number;
   exportedAt: string;
   providers: {
-    modelProviders: ModelProvider[];
-    selectedModel: SelectedModel | null;
+    modelProviders: ReturnType<typeof useProviderStore.getState>["modelProviders"];
+    selectedModel: ReturnType<typeof useProviderStore.getState>["selectedModel"];
   };
   vector: {
     vectorModels: VectorModelConfig[];
@@ -31,6 +31,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null;
 };
 
+const CONFIG_FILE_VERSION = 1;
+
 export const buildExportConfigData = (): AppConfigExportData => {
   const providerState = useProviderStore.getState();
   const llamaState = useLlamaStore.getState();
@@ -38,7 +40,7 @@ export const buildExportConfigData = (): AppConfigExportData => {
   const appSettingsState = useAppSettingsStore.getState();
 
   return {
-    version: 1,
+    version: CONFIG_FILE_VERSION,
     exportedAt: new Date().toISOString(),
     providers: {
       modelProviders: providerState.modelProviders,
@@ -58,14 +60,27 @@ export const buildExportConfigData = (): AppConfigExportData => {
 };
 
 export const exportConfigAsJson = () => {
-  return JSON.stringify(buildExportConfigData(), null, 2);
+  try {
+    return JSON.stringify(buildExportConfigData(), null, 2);
+  } catch {
+    throw new Error("配置序列化失败");
+  }
 };
 
 export const importConfigFromJson = (json: string) => {
-  const parsedData: unknown = JSON.parse(json);
+  let parsedData: unknown;
+  try {
+    parsedData = JSON.parse(json);
+  } catch {
+    throw new Error("配置文件格式无效");
+  }
 
-  if (!isRecord(parsedData) || parsedData.version !== 1) {
-    throw new Error("配置文件格式不支持");
+  if (!isRecord(parsedData)) {
+    throw new Error("配置文件必须是对象结构");
+  }
+
+  if (parsedData.version !== CONFIG_FILE_VERSION) {
+    throw new Error(`配置版本不支持，当前仅支持版本 ${CONFIG_FILE_VERSION}`);
   }
 
   if (isRecord(parsedData.providers) && Array.isArray(parsedData.providers.modelProviders)) {
