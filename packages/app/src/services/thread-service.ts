@@ -1,4 +1,4 @@
-import type { AgentMode, RawThread, Thread, ThreadSummary } from "@/types/thread";
+import { AGENT_MODES, type AgentMode, type RawThread, type Thread, type ThreadSummary } from "@/types/thread";
 import { invoke } from "@tauri-apps/api/core";
 import type { UIMessage } from "ai";
 
@@ -6,6 +6,10 @@ export interface ThreadMetadata {
   semanticContext?: string;
   agentMode?: AgentMode;
   [key: string]: any;
+}
+
+function isAgentMode(value: unknown): value is AgentMode {
+  return typeof value === "string" && AGENT_MODES.includes(value as AgentMode);
 }
 
 export async function createThread(
@@ -108,7 +112,7 @@ export function getThreadContext(thread: Thread): string | undefined {
 export function getThreadAgentMode(thread: Thread): AgentMode | undefined {
   try {
     const metadata: ThreadMetadata = JSON.parse(thread.metadata);
-    if (metadata.agentMode === "solo" || metadata.agentMode === "todo") {
+    if (isAgentMode(metadata.agentMode)) {
       return metadata.agentMode;
     }
     return undefined;

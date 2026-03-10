@@ -4,6 +4,12 @@ import { useLlamaStore } from "@/store/llama-store";
 import { appDataDir } from "@tauri-apps/api/path";
 import { exists, readTextFile } from "@tauri-apps/plugin-fs";
 
+const AGENT_MODE_PROMPTS = {
+  todo:
+    "当前为 Todo 模式。请先给出可执行的分步计划（To-do 列表），再按步骤推进并在关键节点汇报阶段结果。面对复杂任务（如全书剧情浓缩）时，优先拆解为多轮可验证的小目标。",
+  solo: "当前为 Solo 模式。请直接给出高质量结果，必要时在内部完成推理后一次性输出清晰结论。",
+} as const;
+
 export async function buildReadingPrompt(chatContext: ChatContext | undefined): Promise<string> {
   const activeBookId = chatContext?.activeBookId;
   const semanticContext = chatContext?.activeContext;
@@ -65,13 +71,7 @@ export async function buildReadingPrompt(chatContext: ChatContext | undefined): 
     prompt += `\n\n【当前阅读图书元信息与目录】\n${metadataMd}`;
   }
 
-  if (agentMode === "todo") {
-    prompt +=
-      "\n\n【Agent 工作流模式】\n当前为 Todo 模式。请先给出可执行的分步计划（To-do 列表），再按步骤推进并在关键节点汇报阶段结果。面对复杂任务（如全书剧情浓缩）时，优先拆解为多轮可验证的小目标。";
-  } else {
-    prompt +=
-      "\n\n【Agent 工作流模式】\n当前为 Solo 模式。请直接给出高质量结果，必要时在内部完成推理后一次性输出清晰结论。";
-  }
+  prompt += `\n\n【Agent 工作流模式】\n${AGENT_MODE_PROMPTS[agentMode]}`;
 
   return prompt;
 }

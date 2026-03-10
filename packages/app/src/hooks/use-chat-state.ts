@@ -19,7 +19,7 @@ import { useThreadStore } from "@/store/thread-store";
 import type { ChatReference, MessageMetadata } from "@/types/message";
 import type { AgentMode, Thread, ThreadSummary } from "@/types/thread";
 import type { UIMessage } from "ai";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export interface UseChatStateReturn {
   // 基础状态
@@ -80,7 +80,7 @@ interface UseChatStateOptions {
 
 export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
   const { chatContext, setActiveBookId, setActiveContext } = options;
-  const { activeBookId } = chatContext;
+  const { activeBookId, activeContext, activeSectionLabel } = chatContext;
   const [input, setInput] = useState("");
   const [showThreads, setShowThreads] = useState(false);
   const [threadsKey, setThreadsKey] = useState(0);
@@ -101,16 +101,22 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
   };
 
   const { selectedModel, setSelectedModel, currentModelInstance } = useModelSelector("deepseek", "deepseek-chat");
+  const resolvedChatContext = useMemo(
+    () => ({
+      activeBookId,
+      activeContext,
+      activeSectionLabel,
+      agentMode: selectedAgentMode,
+    }),
+    [activeBookId, activeContext, activeSectionLabel, selectedAgentMode],
+  );
 
   const { messages, status, error, stop, setMessages, sendMessage, clearError, regenerate } = useChat(
     currentModelInstance || "deepseek-chat",
     {
       experimental_throttle: 50,
       messages: [],
-      chatContext: {
-        ...chatContext,
-        agentMode: selectedAgentMode,
-      },
+      chatContext: resolvedChatContext,
       onError: (error) => {
         console.error("Error:", error);
       },
@@ -451,6 +457,7 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
 
   const handleSetSelectedAgentMode = useCallback(
     (mode: AgentMode) => {
+      const previousMode = selectedAgentMode;
       setSelectedAgentMode(mode);
       if (!currentThread?.id) {
         return;
@@ -461,9 +468,10 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
         })
         .catch((error) => {
           console.error("Failed to update thread agent mode:", error);
+          setSelectedAgentMode(previousMode);
         });
     },
-    [currentThread?.id, setCurrentThread],
+    [currentThread?.id, selectedAgentMode, setCurrentThread],
   );
 
   const handleNewThread = useCallback(() => {
