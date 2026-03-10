@@ -1,9 +1,10 @@
-import type { RawThread, Thread, ThreadSummary } from "@/types/thread";
+import type { AgentMode, RawThread, Thread, ThreadSummary } from "@/types/thread";
 import { invoke } from "@tauri-apps/api/core";
 import type { UIMessage } from "ai";
 
 export interface ThreadMetadata {
   semanticContext?: string;
+  agentMode?: AgentMode;
   [key: string]: any;
 }
 
@@ -11,12 +12,13 @@ export async function createThread(
   bookId: string | undefined,
   title: string,
   initialMessages: UIMessage[],
+  agentMode?: AgentMode,
 ): Promise<Thread> {
   try {
     const payload = {
       book_id: bookId,
       title,
-      metadata: JSON.stringify({}),
+      metadata: JSON.stringify(agentMode ? { agentMode } : {}),
       messages_json: JSON.stringify(initialMessages),
     };
 
@@ -100,6 +102,36 @@ export function getThreadContext(thread: Thread): string | undefined {
   } catch (error) {
     console.warn("Failed to parse thread metadata:", error);
     return undefined;
+  }
+}
+
+export function getThreadAgentMode(thread: Thread): AgentMode | undefined {
+  try {
+    const metadata: ThreadMetadata = JSON.parse(thread.metadata);
+    if (metadata.agentMode === "solo" || metadata.agentMode === "todo") {
+      return metadata.agentMode;
+    }
+    return undefined;
+  } catch (error) {
+    console.warn("Failed to parse thread metadata:", error);
+    return undefined;
+  }
+}
+
+export async function updateThreadAgentMode(threadId: string, agentMode: AgentMode): Promise<Thread> {
+  try {
+    const currentThread = await getThreadById(threadId);
+    let metadata: ThreadMetadata = {};
+    try {
+      metadata = JSON.parse(currentThread.metadata);
+    } catch (error) {
+      console.warn("Failed to parse existing metadata, using empty object:", error);
+    }
+    metadata.agentMode = agentMode;
+    return await editThread(threadId, { metadata });
+  } catch (error) {
+    console.error("Error updating thread agent mode:", error);
+    throw new Error("Failed to update thread agent mode on the backend.");
   }
 }
 

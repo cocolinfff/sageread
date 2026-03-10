@@ -22,6 +22,7 @@ import { MindmapDialog } from "../tools/mindmap-dialog";
 import { ChatInputArea } from "./chat-input-area";
 import { ChatMessages } from "./chat-messages";
 import { ChatThreads } from "./chat-threads";
+import AgentSelector from "./agent-selector";
 import ModelSelector from "./model-selector";
 
 interface ChatContentProps {
@@ -49,10 +50,12 @@ function ChatContent({ bookId }: ChatContentProps) {
     messages,
     status,
     selectedModel,
+    selectedAgentMode,
 
     stop,
     setInput,
     setSelectedModel,
+    setSelectedAgentMode,
     handleAskSelection,
     handleRemoveReference,
     handleSubmit,
@@ -140,6 +143,11 @@ function ChatContent({ bookId }: ChatContentProps) {
               selectedModel={selectedModel}
               onModelSelect={setSelectedModel}
               className="z-40 w-[12rem] flex-shrink-0"
+            />
+            <AgentSelector
+              selectedAgentMode={selectedAgentMode}
+              onAgentModeSelect={setSelectedAgentMode}
+              className="z-40 w-[7rem] flex-shrink-0"
             />
           </div>
           <div className="flex items-center gap-0">

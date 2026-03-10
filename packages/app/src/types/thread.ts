@@ -1,5 +1,7 @@
 import type { UIMessage } from "ai";
 
+export type AgentMode = "solo" | "todo";
+
 export interface Thread {
   id: string;
   book_id: string | null;

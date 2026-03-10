@@ -5,6 +5,7 @@ import { ChatInputArea } from "@/components/side-chat/chat-input-area";
 import { ChatMessages, TOOL_NAME_MAP } from "@/components/side-chat/chat-messages";
 import { ChatThreads } from "@/components/side-chat/chat-threads";
 import { ContextPopover } from "@/components/side-chat/context-popover";
+import AgentSelector from "@/components/side-chat/agent-selector";
 import ModelSelector from "@/components/side-chat/model-selector";
 import { MindmapViewer } from "@/components/tools/mindmap-viewer";
 import { RagResultViewer } from "@/components/tools/rag-result-viewer";
@@ -156,10 +157,12 @@ function ChatPage() {
     messages,
     status,
     selectedModel,
+    selectedAgentMode,
 
     stop,
     setInput,
     setSelectedModel,
+    setSelectedAgentMode,
     handleAskSelection,
     handleRemoveReference,
     handleSubmit,
@@ -274,6 +277,11 @@ function ChatPage() {
                 <History className="size-5" />
               </Button>
               <ModelSelector selectedModel={selectedModel} onModelSelect={setSelectedModel} className="max-w-60" />
+              <AgentSelector
+                selectedAgentMode={selectedAgentMode}
+                onAgentModeSelect={setSelectedAgentMode}
+                className="max-w-28"
+              />
             </div>
             <div className="flex items-center gap-2">
               <Button
