@@ -2,7 +2,8 @@ import { PromptInput, PromptInputAction, PromptInputTextarea } from "@/component
 import { Button } from "@/components/ui/button";
 import { useIsChatPage } from "@/hooks/use-is-chat-page";
 import type { ChatReference } from "@/types/message";
-import { ArrowUp, BookOpen, Brain, Notebook, Paperclip, Quote, X } from "lucide-react";
+import type { AgentMode } from "@/types/thread";
+import { ArrowUp, BookOpen, Bot, Brain, Notebook, Paperclip, Quote, X } from "lucide-react";
 import { useRef } from "react";
 import { ContextPopover } from "./context-popover";
 
@@ -12,12 +13,14 @@ interface ChatInputAreaProps {
   status: string;
   activeBookId: string | undefined;
   showToolDetail?: boolean;
+  agentMode?: AgentMode;
 
   setInput: (value: string) => void;
   onRemoveReference: (id: string) => void;
   onSubmit: (promptOverride?: string) => Promise<void>;
   onStop: () => void;
   setActiveBookId: (bookId: string | undefined) => void;
+  onAgentModeToggle?: (mode: AgentMode) => void;
 }
 
 const quickActions = [
@@ -32,12 +35,14 @@ export function ChatInputArea({
   references,
   activeBookId,
   showToolDetail = false,
+  agentMode = "off",
 
   setActiveBookId,
   onRemoveReference,
   onSubmit,
   onStop,
   setInput,
+  onAgentModeToggle,
 }: ChatInputAreaProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isChatPage = useIsChatPage();
@@ -129,20 +134,38 @@ export function ChatInputArea({
             className="flex-1 py-2 pl-2 text-sm leading-[1.3] placeholder:font-light dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-400"
           />
           <div className="flex items-center justify-between gap-2">
-            <input ref={fileInputRef} type="file" multiple className="hidden" />
-            <PromptInputAction tooltip="上传文件">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fileInputRef.current?.click();
-                }}
-                className="size-8 rounded-full dark:border-neutral-600 dark:hover:bg-neutral-700"
-              >
-                <Paperclip className="size-4" />
-              </Button>
-            </PromptInputAction>
+            <div className="flex items-center gap-2">
+              <input ref={fileInputRef} type="file" multiple className="hidden" />
+              <PromptInputAction tooltip="上传文件">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="size-8 rounded-full dark:border-neutral-600 dark:hover:bg-neutral-700"
+                >
+                  <Paperclip className="size-4" />
+                </Button>
+              </PromptInputAction>
+
+              {onAgentModeToggle && (
+                <Button
+                  type="button"
+                  variant={agentMode === "on" ? "default" : "outline"}
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAgentModeToggle(agentMode === "on" ? "off" : "on");
+                  }}
+                  className="h-8 gap-1.5 rounded-full px-3 text-xs dark:border-neutral-600 dark:hover:bg-neutral-700"
+                >
+                  <Bot className="size-3.5" />
+                  Agent
+                </Button>
+              )}
+            </div>
 
             <Button
               type="submit"
