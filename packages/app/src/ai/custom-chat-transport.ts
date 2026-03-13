@@ -66,11 +66,6 @@ function attachDeepSeekReasoningContent(
   }
 
   const uiAssistantMessages = uiMessages.filter((message) => message.role === "assistant");
-  const modelAssistantMessages = modelMessages.filter((message) => message.role === "assistant");
-  if (uiAssistantMessages.length !== modelAssistantMessages.length) {
-    return modelMessages;
-  }
-
   const patchedMessages = [...modelMessages];
   let assistantMessageCursor = 0;
 
