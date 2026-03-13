@@ -15,7 +15,9 @@
       "Bash(winget install:*)",
       "Bash(powershell -Command:*)",
       "WebFetch(domain:github.com)",
-      "Bash(git --version)"
+      "Bash(git --version)",
+      "Bash(cd D:/Py/sageread/packages/app && pnpm tauri build)",
+      "Bash(cd D:/Py/sageread/packages/app && rm -rf src-tauri/target/release/bundle src-tauri/target/release/SageRead.exe src-tauri/target/release/SageRead-portable.zip)"
     ]
   }
 }
