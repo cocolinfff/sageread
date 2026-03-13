@@ -28,89 +28,31 @@ import {
 } from "./tools";
 import { processQuoteMessages, selectValidMessages } from "./utils";
 
-interface ReasoningPart {
-  type: "reasoning";
-  text: string;
-}
+// Extract reasoning text from model message content parts and set it as
+// providerOptions.openaiCompatible.reasoning_content on the message level.
+// DeepSeek API requires this field in ALL assistant messages during multi-turn.
+function patchDeepSeekMessages(messages: ModelMessage[]): ModelMessage[] {
+  return messages.map((msg) => {
+    if (msg.role !== "assistant") return msg;
 
-function isReasoningPart(part: unknown): part is ReasoningPart {
-  return (
-    typeof part === "object" &&
-    part !== null &&
-    "type" in part &&
-    "text" in part &&
-    (part as { type?: unknown }).type === "reasoning" &&
-    typeof (part as { text?: unknown }).text === "string"
-  );
-}
+    const reasoningText = Array.isArray(msg.content)
+      ? (msg.content as Array<{ type: string; text?: string }>)
+          .filter((p) => p.type === "reasoning")
+          .map((p) => p.text ?? "")
+          .join("")
+      : "";
 
-function extractReasoningContent(message: UIMessage): string | undefined {
-  if (message.role !== "assistant" || !Array.isArray(message.parts)) {
-    return undefined;
-  }
-
-  const reasoningContent = message.parts
-    .filter(isReasoningPart)
-    .map((part) => part.text)
-    .join("")
-    .trim();
-
-  return reasoningContent || undefined;
-}
-
-function attachDeepSeekReasoningContent(
-  uiMessages: UIMessage[],
-  modelMessages: ModelMessage[],
-  model: LanguageModel,
-): ModelMessage[] {
-  const provider = (model as { provider?: string }).provider;
-  // Check for any DeepSeek provider (deepseek, deepseek-reasoner, etc.)
-  if (typeof provider !== "string" || !provider.includes("deepseek")) {
-    return modelMessages;
-  }
-
-  // Build a map of reasoning content from UI messages by message ID
-  const reasoningById = new Map<string, string>();
-  for (const msg of uiMessages) {
-    if (msg.role === "assistant" && msg.id) {
-      const reasoning = extractReasoningContent(msg);
-      if (reasoning) {
-        reasoningById.set(msg.id, reasoning);
-      }
-    }
-  }
-
-  // Patch all assistant messages in modelMessages
-  const patchedMessages = modelMessages.map((msg) => {
-    if (msg.role !== "assistant") {
-      return msg;
-    }
-
-    // Try to find reasoning content by message ID
-    let reasoningContent: string | undefined;
-    if (msg.experimental?.messageId) {
-      reasoningContent = reasoningById.get(msg.experimental.messageId);
-    }
-
-    // If not found by ID, try to use existing reasoning_content
-    if (!reasoningContent) {
-      reasoningContent = msg.providerOptions?.openaiCompatible?.reasoning_content;
-    }
-
-    // DeepSeek API requires reasoning_content field for all assistant messages when using reasoning models
     return {
       ...msg,
       providerOptions: {
-        ...(msg.providerOptions || {}),
+        ...(msg.providerOptions ?? {}),
         openaiCompatible: {
-          ...(msg.providerOptions?.openaiCompatible || {}),
-          reasoning_content: reasoningContent ?? "",
+          ...(msg.providerOptions?.openaiCompatible ?? {}),
+          reasoning_content: reasoningText,
         },
       },
     };
   });
-
-  return patchedMessages;
 }
 
 export class CustomChatTransport implements ChatTransport<UIMessage> {
@@ -192,7 +134,10 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
       tools,
       ignoreIncompleteToolCalls: true,
     });
-    const patchedMessages = attachDeepSeekReasoningContent(selectedMessages, convertedMessages, this.model);
+
+    const isDeepSeek =
+      typeof (this.model as { provider?: string }).provider === "string" &&
+      (this.model as { provider?: string }).provider!.includes("deepseek");
 
     // Agent mode: stop when taskComplete is called (goal achieved), or fallback to max steps
     const stopCondition = isAgentMode
@@ -200,19 +145,28 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
           hasToolCall("taskComplete")(opts) || stepCountIs(maxStepCount)(opts)
       : stepCountIs(maxStepCount);
 
-    // Agent mode: force first step to call planTask to generate a structured plan
-    const prepareStep = isAgentMode
-      ? ({ stepNumber }: { stepNumber: number }) => {
-          if (stepNumber === 0) {
-            return { toolChoice: { type: "tool" as const, toolName: "planTask" } };
+    // prepareStep: patch DeepSeek reasoning_content at every step (including intermediate steps),
+    // and force planTask on step 0 in agent mode.
+    const prepareStep =
+      isDeepSeek || isAgentMode
+        ? ({
+            stepNumber,
+            messages,
+          }: {
+            stepNumber: number;
+            messages: ModelMessage[];
+          }) => {
+            const msgs = isDeepSeek ? patchDeepSeekMessages(messages) : messages;
+            if (isAgentMode && stepNumber === 0) {
+              return { toolChoice: { type: "tool" as const, toolName: "planTask" }, messages: msgs };
+            }
+            return isDeepSeek ? { messages: msgs } : undefined;
           }
-          return undefined;
-        }
-      : undefined;
+        : undefined;
 
     const result = streamText({
       model: this.model,
-      messages: patchedMessages,
+      messages: convertedMessages,
       abortSignal: options.abortSignal,
       toolChoice: "auto",
       stopWhen: stopCondition,
