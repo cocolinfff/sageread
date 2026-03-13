@@ -5,16 +5,15 @@ import { appDataDir } from "@tauri-apps/api/path";
 import { exists, readTextFile } from "@tauri-apps/plugin-fs";
 
 const AGENT_MODE_PROMPTS = {
-  todo:
-    "当前为 Todo 模式。请先给出可执行的分步计划（To-do 列表），再按步骤推进并在关键节点汇报阶段结果。面对复杂任务（如全书剧情浓缩）时，优先拆解为多轮可验证的小目标。",
-  solo: "当前为 Solo 模式。请直接给出高质量结果，必要时在内部完成推理后一次性输出清晰结论。",
+  on: "当前已开启 Agent 模式。请先给出可执行的分步计划（To-do 列表），再按步骤推进并在关键节点汇报阶段结果。面对复杂任务（如全书剧情浓缩）时，优先拆解为多轮可验证的小目标。",
+  off: "当前为普通模式。请直接给出高质量结果，必要时在内部完成推理后一次性输出清晰结论。",
 } as const;
 
 export async function buildReadingPrompt(chatContext: ChatContext | undefined): Promise<string> {
   const activeBookId = chatContext?.activeBookId;
   const semanticContext = chatContext?.activeContext;
   const sectionLabel = chatContext?.activeSectionLabel;
-  const agentMode = chatContext?.agentMode || "solo";
+  const agentMode = chatContext?.agentMode || "off";
   let systemPromptBase = "";
   let activeSkillNames: string[] = [];
 

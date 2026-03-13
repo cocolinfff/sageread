@@ -153,7 +153,7 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
 
     const chatContext = (requestBody as any)?.chatContext as ChatContext | undefined;
     const activeBookId = chatContext?.activeBookId;
-    const maxStepCount = chatContext?.agentMode === "todo" ? 40 : 20;
+    const maxStepCount = chatContext?.agentMode === "on" ? 40 : 20;
 
     const processedMessages = processQuoteMessages(options.messages);
     const selectedMessages = selectValidMessages(processedMessages, 8);
