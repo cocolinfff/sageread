@@ -17,7 +17,9 @@
       "WebFetch(domain:github.com)",
       "Bash(git --version)",
       "Bash(cd D:/Py/sageread/packages/app && pnpm tauri build)",
-      "Bash(cd D:/Py/sageread/packages/app && rm -rf src-tauri/target/release/bundle src-tauri/target/release/SageRead.exe src-tauri/target/release/SageRead-portable.zip)"
+      "Bash(cd D:/Py/sageread/packages/app && rm -rf src-tauri/target/release/bundle src-tauri/target/release/SageRead.exe src-tauri/target/release/SageRead-portable.zip)",
+      "Bash(cd D:/Py/sageread/packages/app/src-tauri/target/release && powershell Compress-Archive -Path SageRead.exe -DestinationPath SageRead-portable.zip -Force)",
+      "Bash(ls -lh D:/Py/sageread/packages/app/src-tauri/target/release/SageRead.exe D:/Py/sageread/packages/app/src-tauri/target/release/bundle/msi/*.msi D:/Py/sageread/packages/app/src-tauri/target/release/bundle/nsis/*.exe && cd D:/Py/sageread/packages/app/src-tauri/target/release && powershell Compress-Archive -Path SageRead.exe -DestinationPath SageRead-portable.zip -Force)"
     ]
   }
 }

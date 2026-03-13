@@ -61,37 +61,51 @@ function attachDeepSeekReasoningContent(
   model: LanguageModel,
 ): ModelMessage[] {
   const provider = (model as { provider?: string }).provider;
-  if (typeof provider !== "string" || !provider.startsWith("deepseek.")) {
+  // Check for any DeepSeek provider (deepseek, deepseek-reasoner, etc.)
+  if (typeof provider !== "string" || !provider.includes("deepseek")) {
     return modelMessages;
   }
 
-  const uiAssistantMessages = uiMessages.filter((message) => message.role === "assistant");
-  const patchedMessages = [...modelMessages];
-  const modelAssistantIndices = modelMessages
-    .map((message, index) => (message.role === "assistant" ? index : -1))
-    .filter((index) => index !== -1);
-
-  for (const [assistantIndex, uiAssistantMessage] of uiAssistantMessages.entries()) {
-    const messageIndex = modelAssistantIndices[assistantIndex];
-    if (messageIndex === undefined) {
-      break;
-    }
-    const reasoningContent = extractReasoningContent(uiAssistantMessage);
-    const assistantMessage = patchedMessages[messageIndex];
-    if (reasoningContent) {
-      patchedMessages[messageIndex] = {
-        ...assistantMessage,
-        providerOptions: {
-          ...(assistantMessage.providerOptions || {}),
-          openaiCompatible: {
-            ...(assistantMessage.providerOptions?.openaiCompatible || {}),
-            reasoning_content:
-              assistantMessage.providerOptions?.openaiCompatible?.reasoning_content ?? reasoningContent,
-          },
-        },
-      };
+  // Build a map of reasoning content from UI messages by message ID
+  const reasoningById = new Map<string, string>();
+  for (const msg of uiMessages) {
+    if (msg.role === "assistant" && msg.id) {
+      const reasoning = extractReasoningContent(msg);
+      if (reasoning) {
+        reasoningById.set(msg.id, reasoning);
+      }
     }
   }
+
+  // Patch all assistant messages in modelMessages
+  const patchedMessages = modelMessages.map((msg) => {
+    if (msg.role !== "assistant") {
+      return msg;
+    }
+
+    // Try to find reasoning content by message ID
+    let reasoningContent: string | undefined;
+    if (msg.experimental?.messageId) {
+      reasoningContent = reasoningById.get(msg.experimental.messageId);
+    }
+
+    // If not found by ID, try to use existing reasoning_content
+    if (!reasoningContent) {
+      reasoningContent = msg.providerOptions?.openaiCompatible?.reasoning_content;
+    }
+
+    // DeepSeek API requires reasoning_content field for all assistant messages when using reasoning models
+    return {
+      ...msg,
+      providerOptions: {
+        ...(msg.providerOptions || {}),
+        openaiCompatible: {
+          ...(msg.providerOptions?.openaiCompatible || {}),
+          reasoning_content: reasoningContent ?? "",
+        },
+      },
+    };
+  });
 
   return patchedMessages;
 }
