@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { exportConfigAsJson, importConfigFromJson } from "@/services/config-transfer-service";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -10,11 +11,12 @@ import { useThemeStore } from "@/store/theme-store";
 import type { ThemeMode } from "@/styles/themes";
 import { getVersion } from "@tauri-apps/api/app";
 import { appDataDir } from "@tauri-apps/api/path";
-import { exists, mkdir } from "@tauri-apps/plugin-fs";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { exists, mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { check } from "@tauri-apps/plugin-updater";
 import clsx from "clsx";
-import { Check, ChevronDownIcon, Copy, FolderOpen, RefreshCw } from "lucide-react";
+import { Check, ChevronDownIcon, Copy, Download, FolderOpen, RefreshCw, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -97,6 +99,49 @@ export default function GeneralSettings() {
 
   const handleThemeModeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
+  };
+
+  const handleExportConfig = async () => {
+    try {
+      const path = await save({
+        defaultPath: `sageread-config-${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+
+      if (!path) {
+        return;
+      }
+
+      await writeTextFile(path, exportConfigAsJson());
+      toast.success("配置导出成功");
+    } catch (error) {
+      console.error("Export config failed:", error);
+      toast.error("配置导出失败", {
+        description: error instanceof Error ? error.message : "未知错误",
+      });
+    }
+  };
+
+  const handleImportConfig = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+
+      if (!selected || Array.isArray(selected)) {
+        return;
+      }
+
+      const content = await readTextFile(selected);
+      importConfigFromJson(content);
+      toast.success("配置导入成功");
+    } catch (error) {
+      console.error("Import config failed:", error);
+      toast.error("配置导入失败", {
+        description: error instanceof Error ? error.message : "未知错误",
+      });
+    }
   };
 
   const getCurrentThemeModeLabel = () => {
@@ -207,6 +252,17 @@ export default function GeneralSettings() {
                 </Button>
               </div>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleExportConfig} className="gap-2">
+              <Download className="size-4" />
+              导出配置
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleImportConfig} className="gap-2">
+              <Upload className="size-4" />
+              导入配置
+            </Button>
           </div>
         </div>
       </section>
