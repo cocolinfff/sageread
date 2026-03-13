@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(node:*)",
+      "Bash(npx pnpm build)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm build)",
+      "Bash(npx tauri build)",
+      "Bash(cargo:*)",
+      "Bash(rustc:*)",
+      "Bash(rustup:*)",
+      "Bash(winget install:*)",
+      "Bash(powershell -Command:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(git --version)"
+    ]
+  }
+}
