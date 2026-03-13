@@ -6,6 +6,7 @@ import {
   type ChatRequestOptions,
   type ChatTransport,
   type LanguageModel,
+  type ModelMessage,
   type PrepareSendMessagesRequest,
   type UIMessageChunk,
   convertToModelMessages,
@@ -24,15 +25,29 @@ import {
 } from "./tools";
 import { processQuoteMessages, selectValidMessages } from "./utils";
 
+interface ReasoningPart {
+  type: "reasoning";
+  text: string;
+}
+
+function isReasoningPart(part: unknown): part is ReasoningPart {
+  return (
+    typeof part === "object" &&
+    part !== null &&
+    "type" in part &&
+    "text" in part &&
+    (part as { type?: unknown }).type === "reasoning" &&
+    typeof (part as { text?: unknown }).text === "string"
+  );
+}
+
 function extractReasoningContent(message: UIMessage): string | undefined {
   if (message.role !== "assistant" || !Array.isArray(message.parts)) {
     return undefined;
   }
 
   const reasoningContent = message.parts
-    .filter((part): part is { type: "reasoning"; text: string } => {
-      return part?.type === "reasoning" && typeof (part as any).text === "string";
-    })
+    .filter(isReasoningPart)
     .map((part) => part.text)
     .join("")
     .trim();
@@ -42,27 +57,24 @@ function extractReasoningContent(message: UIMessage): string | undefined {
 
 function attachDeepSeekReasoningContent(
   uiMessages: UIMessage[],
-  modelMessages: any[],
+  modelMessages: ModelMessage[],
   model: LanguageModel,
-): any[] {
+): ModelMessage[] {
   const provider = (model as { provider?: string }).provider;
   if (typeof provider !== "string" || !provider.startsWith("deepseek.")) {
+    return modelMessages;
+  }
+
+  const uiAssistantMessages = uiMessages.filter((message) => message.role === "assistant");
+  const modelAssistantMessages = modelMessages.filter((message) => message.role === "assistant");
+  if (uiAssistantMessages.length !== modelAssistantMessages.length) {
     return modelMessages;
   }
 
   const patchedMessages = [...modelMessages];
   let assistantMessageCursor = 0;
 
-  for (const uiMessage of uiMessages) {
-    if (uiMessage.role !== "assistant") {
-      continue;
-    }
-
-    const reasoningContent = extractReasoningContent(uiMessage);
-    if (!reasoningContent) {
-      continue;
-    }
-
+  for (const uiAssistantMessage of uiAssistantMessages) {
     while (assistantMessageCursor < patchedMessages.length && patchedMessages[assistantMessageCursor]?.role !== "assistant") {
       assistantMessageCursor++;
     }
@@ -71,18 +83,22 @@ function attachDeepSeekReasoningContent(
       break;
     }
 
+    const reasoningContent = extractReasoningContent(uiAssistantMessage);
     const assistantMessage = patchedMessages[assistantMessageCursor];
-    patchedMessages[assistantMessageCursor] = {
-      ...assistantMessage,
-      providerOptions: {
-        ...(assistantMessage.providerOptions || {}),
-        openaiCompatible: {
-          ...(assistantMessage.providerOptions?.openaiCompatible || {}),
-          reasoning_content:
-            assistantMessage.providerOptions?.openaiCompatible?.reasoning_content ?? reasoningContent,
+    if (reasoningContent) {
+      patchedMessages[assistantMessageCursor] = {
+        ...assistantMessage,
+        providerOptions: {
+          ...(assistantMessage.providerOptions || {}),
+          openaiCompatible: {
+            ...(assistantMessage.providerOptions?.openaiCompatible || {}),
+            reasoning_content:
+              assistantMessage.providerOptions?.openaiCompatible?.reasoning_content ?? reasoningContent,
+          },
         },
-      },
-    };
+      };
+    }
+
     assistantMessageCursor++;
   }
 
