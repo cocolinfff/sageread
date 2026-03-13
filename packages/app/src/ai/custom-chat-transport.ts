@@ -24,6 +24,71 @@ import {
 } from "./tools";
 import { processQuoteMessages, selectValidMessages } from "./utils";
 
+function extractReasoningContent(message: UIMessage): string | undefined {
+  if (message.role !== "assistant" || !Array.isArray(message.parts)) {
+    return undefined;
+  }
+
+  const reasoningContent = message.parts
+    .filter((part): part is { type: "reasoning"; text: string } => {
+      return part?.type === "reasoning" && typeof (part as any).text === "string";
+    })
+    .map((part) => part.text)
+    .join("")
+    .trim();
+
+  return reasoningContent || undefined;
+}
+
+function attachDeepSeekReasoningContent(
+  uiMessages: UIMessage[],
+  modelMessages: any[],
+  model: LanguageModel,
+): any[] {
+  const provider = (model as { provider?: string }).provider;
+  if (typeof provider !== "string" || !provider.startsWith("deepseek.")) {
+    return modelMessages;
+  }
+
+  const patchedMessages = [...modelMessages];
+  let assistantMessageCursor = 0;
+
+  for (const uiMessage of uiMessages) {
+    if (uiMessage.role !== "assistant") {
+      continue;
+    }
+
+    const reasoningContent = extractReasoningContent(uiMessage);
+    if (!reasoningContent) {
+      continue;
+    }
+
+    while (assistantMessageCursor < patchedMessages.length && patchedMessages[assistantMessageCursor]?.role !== "assistant") {
+      assistantMessageCursor++;
+    }
+
+    if (assistantMessageCursor >= patchedMessages.length) {
+      break;
+    }
+
+    const assistantMessage = patchedMessages[assistantMessageCursor];
+    patchedMessages[assistantMessageCursor] = {
+      ...assistantMessage,
+      providerOptions: {
+        ...(assistantMessage.providerOptions || {}),
+        openaiCompatible: {
+          ...(assistantMessage.providerOptions?.openaiCompatible || {}),
+          reasoning_content:
+            assistantMessage.providerOptions?.openaiCompatible?.reasoning_content ?? reasoningContent,
+        },
+      },
+    };
+    assistantMessageCursor++;
+  }
+
+  return patchedMessages;
+}
+
 export class CustomChatTransport implements ChatTransport<UIMessage> {
   private model: LanguageModel;
   private prepareSendMessagesRequest?: PrepareSendMessagesRequest<UIMessage>;
@@ -96,10 +161,11 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
       tools,
       ignoreIncompleteToolCalls: true,
     });
+    const patchedMessages = attachDeepSeekReasoningContent(selectedMessages, convertedMessages, this.model);
 
     const result = streamText({
       model: this.model,
-      messages: convertedMessages,
+      messages: patchedMessages,
       abortSignal: options.abortSignal,
       toolChoice: "auto",
       stopWhen: stepCountIs(20),
