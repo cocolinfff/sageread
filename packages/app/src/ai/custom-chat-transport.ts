@@ -72,6 +72,7 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
 
     const chatContext = (requestBody as any)?.chatContext as ChatContext | undefined;
     const activeBookId = chatContext?.activeBookId;
+    const maxStepCount = chatContext?.agentMode === "todo" ? 40 : 20;
 
     const processedMessages = processQuoteMessages(options.messages);
     const selectedMessages = selectValidMessages(processedMessages, 8);
@@ -102,7 +103,7 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
       messages: convertedMessages,
       abortSignal: options.abortSignal,
       toolChoice: "auto",
-      stopWhen: stepCountIs(20),
+      stopWhen: stepCountIs(maxStepCount),
       tools,
       system: await buildReadingPrompt(chatContext),
     });

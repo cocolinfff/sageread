@@ -7,17 +7,19 @@ import { generateContextWithAI } from "@/services/ai-context-service";
 import {
   createThread,
   editThread,
+  getThreadAgentMode,
   getLatestThreadBybookId,
   getThreadById,
   getThreadContext,
+  updateThreadAgentMode,
   updateThreadContext,
 } from "@/services/thread-service";
 import { type SelectedModel, useProviderStore } from "@/store/provider-store";
 import { useThreadStore } from "@/store/thread-store";
 import type { ChatReference, MessageMetadata } from "@/types/message";
-import type { Thread, ThreadSummary } from "@/types/thread";
+import type { AgentMode, Thread, ThreadSummary } from "@/types/thread";
 import type { UIMessage } from "ai";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export interface UseChatStateReturn {
   // 基础状态
@@ -39,6 +41,8 @@ export interface UseChatStateReturn {
   // 模型相关
   selectedModel: SelectedModel | null;
   setSelectedModel: (model: SelectedModel) => void;
+  selectedAgentMode: AgentMode;
+  setSelectedAgentMode: (mode: AgentMode) => void;
 
   // 引用管理
   handleAskSelection: (text: string) => void;
@@ -63,6 +67,7 @@ export interface ChatContext {
   activeBookId?: string;
   activeContext?: string;
   activeSectionLabel?: string;
+  agentMode?: AgentMode;
 }
 
 interface UseChatStateOptions {
@@ -75,12 +80,13 @@ interface UseChatStateOptions {
 
 export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
   const { chatContext, setActiveBookId, setActiveContext } = options;
-  const { activeBookId } = chatContext;
+  const { activeBookId, activeContext, activeSectionLabel } = chatContext;
   const [input, setInput] = useState("");
   const [showThreads, setShowThreads] = useState(false);
   const [threadsKey, setThreadsKey] = useState(0);
   const [displayError, setDisplayError] = useState<Error | null>(null);
   const [references, setReferences] = useState<ChatReference[]>([]);
+  const [selectedAgentMode, setSelectedAgentMode] = useState<AgentMode>("solo");
   const isInit = useRef(false);
   const globalThreadStore = useThreadStore();
   const currentThread = options.currentThread !== undefined ? options.currentThread : globalThreadStore.currentThread;
@@ -95,13 +101,22 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
   };
 
   const { selectedModel, setSelectedModel, currentModelInstance } = useModelSelector("deepseek", "deepseek-chat");
+  const resolvedChatContext = useMemo(
+    () => ({
+      activeBookId,
+      activeContext,
+      activeSectionLabel,
+      agentMode: selectedAgentMode,
+    }),
+    [activeBookId, activeContext, activeSectionLabel, selectedAgentMode],
+  );
 
   const { messages, status, error, stop, setMessages, sendMessage, clearError, regenerate } = useChat(
     currentModelInstance || "deepseek-chat",
     {
       experimental_throttle: 50,
       messages: [],
-      chatContext,
+      chatContext: resolvedChatContext,
       onError: (error) => {
         console.error("Error:", error);
       },
@@ -174,7 +189,7 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
                 .find((m) => m.role === "user")
                 ?.parts?.map((p: any) => (p.type === "text" ? p.text : ""))
                 .join("") || "新对话";
-            createThread(activeBookId, firstUserText.slice(0, 50), normalizedMessages)
+            createThread(activeBookId, firstUserText.slice(0, 50), normalizedMessages, selectedAgentMode)
               .then((thread) => {
                 console.log("Created thread on finish:", thread.id);
                 setCurrentThread(thread);
@@ -236,6 +251,7 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
             setCurrentThread(latestThread);
             setMessages(latestThread.messages);
             setActiveContext(getThreadContext(latestThread) || undefined);
+            setSelectedAgentMode(getThreadAgentMode(latestThread) || "solo");
           }
           isInit.current = true;
         } catch (error) {
@@ -378,7 +394,7 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
       if (messages.length === 0 && !currentThread) {
         try {
           const titleSource = trimmedInput || referenceSnapshot[0]?.text || "新对话";
-          const thread = await createThread(activeBookId, titleSource.substring(0, 50), []);
+          const thread = await createThread(activeBookId, titleSource.substring(0, 50), [], selectedAgentMode);
           setCurrentThread(thread);
           console.log("Created new thread:", thread.id);
         } catch (error) {
@@ -435,7 +451,27 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
       setMessages,
       setCurrentThread,
       generateSemanticContextAsync,
+      selectedAgentMode,
     ],
+  );
+
+  const handleSetSelectedAgentMode = useCallback(
+    (mode: AgentMode) => {
+      const previousMode = selectedAgentMode;
+      setSelectedAgentMode(mode);
+      if (!currentThread?.id) {
+        return;
+      }
+      updateThreadAgentMode(currentThread.id, mode)
+        .then((updatedThread) => {
+          setCurrentThread(updatedThread);
+        })
+        .catch((error) => {
+          console.error("Failed to update thread agent mode:", error);
+          setSelectedAgentMode(previousMode);
+        });
+    },
+    [currentThread?.id, selectedAgentMode, setCurrentThread],
   );
 
   const handleNewThread = useCallback(() => {
@@ -443,6 +479,7 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
     setMessages([]);
     setDisplayError(null);
     setReferences([]);
+    setSelectedAgentMode("solo");
   }, [setCurrentThread, setMessages]);
 
   const handleShowThreads = useCallback(() => {
@@ -466,6 +503,7 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
         setShowThreads(false);
         const threadContext = getThreadContext(fullThread);
         setActiveContext(threadContext || undefined);
+        setSelectedAgentMode(getThreadAgentMode(fullThread) || "solo");
 
         console.log("Selected thread:", fullThread.id, "context loaded:", !!threadContext);
       } catch (error) {
@@ -521,6 +559,8 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
     // 模型相关
     selectedModel,
     setSelectedModel,
+    selectedAgentMode,
+    setSelectedAgentMode: handleSetSelectedAgentMode,
 
     // 引用管理
     handleAskSelection,

@@ -1,5 +1,8 @@
 import type { UIMessage } from "ai";
 
+export const AGENT_MODES = ["solo", "todo"] as const;
+export type AgentMode = (typeof AGENT_MODES)[number];
+
 export interface Thread {
   id: string;
   book_id: string | null;
