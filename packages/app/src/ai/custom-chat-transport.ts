@@ -67,21 +67,19 @@ function attachDeepSeekReasoningContent(
 
   const uiAssistantMessages = uiMessages.filter((message) => message.role === "assistant");
   const patchedMessages = [...modelMessages];
-  let assistantMessageCursor = 0;
+  const modelAssistantIndices = modelMessages
+    .map((message, index) => (message.role === "assistant" ? index : -1))
+    .filter((index) => index !== -1);
 
-  for (const uiAssistantMessage of uiAssistantMessages) {
-    while (assistantMessageCursor < patchedMessages.length && patchedMessages[assistantMessageCursor]?.role !== "assistant") {
-      assistantMessageCursor++;
-    }
-
-    if (assistantMessageCursor >= patchedMessages.length) {
+  for (const [assistantIndex, uiAssistantMessage] of uiAssistantMessages.entries()) {
+    const messageIndex = modelAssistantIndices[assistantIndex];
+    if (messageIndex === undefined) {
       break;
     }
-
     const reasoningContent = extractReasoningContent(uiAssistantMessage);
-    const assistantMessage = patchedMessages[assistantMessageCursor];
+    const assistantMessage = patchedMessages[messageIndex];
     if (reasoningContent) {
-      patchedMessages[assistantMessageCursor] = {
+      patchedMessages[messageIndex] = {
         ...assistantMessage,
         providerOptions: {
           ...(assistantMessage.providerOptions || {}),
@@ -93,8 +91,6 @@ function attachDeepSeekReasoningContent(
         },
       };
     }
-
-    assistantMessageCursor++;
   }
 
   return patchedMessages;
