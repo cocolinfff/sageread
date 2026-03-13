@@ -10,6 +10,7 @@ import {
   type PrepareSendMessagesRequest,
   type UIMessageChunk,
   convertToModelMessages,
+  hasToolCall,
   stepCountIs,
   streamText,
 } from "ai";
@@ -22,6 +23,8 @@ import {
   getSkillsTool,
   mindmapTool,
   notesTool,
+  planTaskTool,
+  taskCompleteTool,
 } from "./tools";
 import { processQuoteMessages, selectValidMessages } from "./utils";
 
@@ -153,7 +156,8 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
 
     const chatContext = (requestBody as any)?.chatContext as ChatContext | undefined;
     const activeBookId = chatContext?.activeBookId;
-    const maxStepCount = chatContext?.agentMode === "on" ? 40 : 20;
+    const isAgentMode = chatContext?.agentMode === "on";
+    const maxStepCount = isAgentMode ? 40 : 20;
 
     const processedMessages = processQuoteMessages(options.messages);
     const selectedMessages = selectValidMessages(processedMessages, 8);
@@ -174,20 +178,42 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
       tools.ragContext = createRagContextTool(activeBookId);
     }
 
+    if (isAgentMode) {
+      tools.planTask = planTaskTool;
+      tools.taskComplete = taskCompleteTool;
+    }
+
     const convertedMessages = convertToModelMessages(selectedMessages, {
       tools,
       ignoreIncompleteToolCalls: true,
     });
     const patchedMessages = attachDeepSeekReasoningContent(selectedMessages, convertedMessages, this.model);
 
+    // Agent mode: stop when taskComplete is called (goal achieved), or fallback to max steps
+    const stopCondition = isAgentMode
+      ? (opts: Parameters<ReturnType<typeof stepCountIs>>[0]) =>
+          hasToolCall("taskComplete")(opts) || stepCountIs(maxStepCount)(opts)
+      : stepCountIs(maxStepCount);
+
+    // Agent mode: force first step to call planTask to generate a structured plan
+    const prepareStep = isAgentMode
+      ? ({ stepNumber }: { stepNumber: number }) => {
+          if (stepNumber === 0) {
+            return { toolChoice: { type: "tool" as const, toolName: "planTask" } };
+          }
+          return undefined;
+        }
+      : undefined;
+
     const result = streamText({
       model: this.model,
       messages: patchedMessages,
       abortSignal: options.abortSignal,
       toolChoice: "auto",
-      stopWhen: stepCountIs(maxStepCount),
+      stopWhen: stopCondition,
       tools,
       system: await buildReadingPrompt(chatContext),
+      prepareStep,
     });
 
     return result.toUIMessageStream({
