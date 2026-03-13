@@ -86,7 +86,7 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
   const [threadsKey, setThreadsKey] = useState(0);
   const [displayError, setDisplayError] = useState<Error | null>(null);
   const [references, setReferences] = useState<ChatReference[]>([]);
-  const [selectedAgentMode, setSelectedAgentMode] = useState<AgentMode>("solo");
+  const [selectedAgentMode, setSelectedAgentMode] = useState<AgentMode>("off");
   const isInit = useRef(false);
   const globalThreadStore = useThreadStore();
   const currentThread = options.currentThread !== undefined ? options.currentThread : globalThreadStore.currentThread;
@@ -251,7 +251,7 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
             setCurrentThread(latestThread);
             setMessages(latestThread.messages);
             setActiveContext(getThreadContext(latestThread) || undefined);
-            setSelectedAgentMode(getThreadAgentMode(latestThread) || "solo");
+            setSelectedAgentMode(getThreadAgentMode(latestThread) || "off");
           }
           isInit.current = true;
         } catch (error) {
@@ -479,7 +479,7 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
     setMessages([]);
     setDisplayError(null);
     setReferences([]);
-    setSelectedAgentMode("solo");
+    setSelectedAgentMode("off");
   }, [setCurrentThread, setMessages]);
 
   const handleShowThreads = useCallback(() => {
@@ -503,7 +503,7 @@ export function useChatState(options: UseChatStateOptions): UseChatStateReturn {
         setShowThreads(false);
         const threadContext = getThreadContext(fullThread);
         setActiveContext(threadContext || undefined);
-        setSelectedAgentMode(getThreadAgentMode(fullThread) || "solo");
+        setSelectedAgentMode(getThreadAgentMode(fullThread) || "off");
 
         console.log("Selected thread:", fullThread.id, "context loaded:", !!threadContext);
       } catch (error) {

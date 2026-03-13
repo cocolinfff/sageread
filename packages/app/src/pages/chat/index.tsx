@@ -5,7 +5,6 @@ import { ChatInputArea } from "@/components/side-chat/chat-input-area";
 import { ChatMessages, TOOL_NAME_MAP } from "@/components/side-chat/chat-messages";
 import { ChatThreads } from "@/components/side-chat/chat-threads";
 import { ContextPopover } from "@/components/side-chat/context-popover";
-import AgentSelector from "@/components/side-chat/agent-selector";
 import ModelSelector from "@/components/side-chat/model-selector";
 import { MindmapViewer } from "@/components/tools/mindmap-viewer";
 import { RagResultViewer } from "@/components/tools/rag-result-viewer";
@@ -14,8 +13,10 @@ import { useChatState } from "@/hooks/use-chat-state";
 import { useAppSettingsStore } from "@/store/app-settings-store";
 import { useChatReaderStore } from "@/store/chat-reader-store";
 import { useThemeStore } from "@/store/theme-store";
+import type { AgentMode } from "@/types/thread";
 import {
   Brain,
+  Bot,
   History,
   Lightbulb,
   MessageCirclePlus,
@@ -36,9 +37,11 @@ interface EmptyStateProps {
   handleSubmit: (promptOverride?: string) => Promise<void>;
   stop: () => void;
   status: string;
+  agentMode: AgentMode;
+  onAgentModeToggle: (mode: AgentMode) => void;
 }
 
-const EmptyState = memo(({ input, setInput, handleSubmit, stop, status }: EmptyStateProps) => {
+const EmptyState = memo(({ input, setInput, handleSubmit, stop, status, agentMode, onAgentModeToggle }: EmptyStateProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { activeBookId, setActiveBookId } = useChatReaderStore();
   const promptSuggestions = [
@@ -74,20 +77,36 @@ const EmptyState = memo(({ input, setInput, handleSubmit, stop, status }: EmptyS
               className="flex-1 py-2 pl-1 text-base leading-[1.5] placeholder:font-normal dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-400"
             />
             <div className="flex items-center justify-between gap-2 pb-1">
-              <input ref={fileInputRef} type="file" multiple className="hidden" />
-              <PromptInputAction tooltip="上传文件">
+              <div className="flex items-center gap-2">
+                <input ref={fileInputRef} type="file" multiple className="hidden" />
+                <PromptInputAction tooltip="上传文件">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                    className="size-8 rounded-full dark:border-neutral-600 dark:hover:bg-neutral-700"
+                  >
+                    <Paperclip className="size-4" />
+                  </Button>
+                </PromptInputAction>
+
                 <Button
-                  variant="outline"
-                  size="icon"
+                  type="button"
+                  variant={agentMode === "on" ? "default" : "outline"}
+                  size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    fileInputRef.current?.click();
+                    onAgentModeToggle(agentMode === "on" ? "off" : "on");
                   }}
-                  className="size-8 rounded-full dark:border-neutral-600 dark:hover:bg-neutral-700"
+                  className="h-8 gap-1.5 rounded-full px-3 text-xs dark:border-neutral-600 dark:hover:bg-neutral-700"
                 >
-                  <Paperclip className="size-4" />
+                  <Bot className="size-3.5" />
+                  Agent
                 </Button>
-              </PromptInputAction>
+              </div>
 
               <Button
                 type="button"
@@ -277,11 +296,6 @@ function ChatPage() {
                 <History className="size-5" />
               </Button>
               <ModelSelector selectedModel={selectedModel} onModelSelect={setSelectedModel} className="max-w-60" />
-              <AgentSelector
-                selectedAgentMode={selectedAgentMode}
-                onAgentModeSelect={setSelectedAgentMode}
-                className="max-w-28"
-              />
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -309,7 +323,7 @@ function ChatPage() {
 
           <div className="flex flex-1 flex-col overflow-hidden">
             {messages.length === 0 && isInit.current ? (
-              <EmptyState input={input} setInput={setInput} handleSubmit={handleSubmit} stop={stop} status={status} />
+              <EmptyState input={input} setInput={setInput} handleSubmit={handleSubmit} stop={stop} status={status} agentMode={selectedAgentMode} onAgentModeToggle={setSelectedAgentMode} />
             ) : (
               <>
                 <ChatContainerRoot className="relative flex-1" autoScroll={autoScroll} contextRef={scrollContextRef}>
@@ -345,6 +359,8 @@ function ChatPage() {
                       activeBookId={activeBookId}
                       setActiveBookId={setActiveBookId}
                       showToolDetail={showToolDetail}
+                      agentMode={selectedAgentMode}
+                      onAgentModeToggle={setSelectedAgentMode}
                     />
                   </div>
                 </div>

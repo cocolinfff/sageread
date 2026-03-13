@@ -22,7 +22,6 @@ import { MindmapDialog } from "../tools/mindmap-dialog";
 import { ChatInputArea } from "./chat-input-area";
 import { ChatMessages } from "./chat-messages";
 import { ChatThreads } from "./chat-threads";
-import AgentSelector from "./agent-selector";
 import ModelSelector from "./model-selector";
 
 interface ChatContentProps {
@@ -144,11 +143,6 @@ function ChatContent({ bookId }: ChatContentProps) {
               onModelSelect={setSelectedModel}
               className="z-40 w-[12rem] flex-shrink-0"
             />
-            <AgentSelector
-              selectedAgentMode={selectedAgentMode}
-              onAgentModeSelect={setSelectedAgentMode}
-              className="z-40 w-[7rem] flex-shrink-0"
-            />
           </div>
           <div className="flex items-center gap-0">
             <Button
@@ -220,6 +214,8 @@ function ChatContent({ bookId }: ChatContentProps) {
           status={status}
           activeBookId={bookId}
           setActiveBookId={() => {}}
+          agentMode={selectedAgentMode}
+          onAgentModeToggle={setSelectedAgentMode}
         />
       )}
 

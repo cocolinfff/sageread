@@ -7,3 +7,5 @@ export { getBooksTool } from "./book";
 export { getReadingStatsTool } from "./reading-stats";
 export { notesTool } from "./notes";
 export { mindmapTool } from "./mindmap";
+export { planTaskTool } from "./plan-task";
+export { taskCompleteTool } from "./task-complete";
